@@ -105,19 +105,21 @@ pub(crate) async fn get(
             .body(body));
     }
 
-    // Serve the file as-is with the appropriate Content-Encoding header
-    let encoding = if ext == "bz2" {
-        HeaderValue::from_static("bzip2")
-    } else {
-        HeaderValue::from_static("identity")
-    };
-
     let log = NamedFile::open_async(&build_log)
         .await
         .io_context(format!("Failed to open build log: {}", build_log.display()))?
         .customize()
-        .insert_header(cache_control_max_age_1y())
-        .insert_header(("Content-Encoding", encoding));
+        .insert_header(cache_control_max_age_1y());
+
+    // Serve the file as-is with the appropriate Content-Encoding header
+    let log = if ext == "bz2" {
+        log.insert_header((
+            http::header::CONTENT_ENCODING,
+            HeaderValue::from_static("bzip2"),
+        ))
+    } else {
+        log
+    };
 
     Ok(log.respond_to(&req).map_into_boxed_body())
 }
